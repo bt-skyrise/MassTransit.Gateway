@@ -34,7 +34,6 @@ packages
 # Tests
 TestResult.xml
 submit.xml
-tests/*
 SolutionVersion.cs
 src/SolutionVersion.cs
 doc/build/*
