@@ -1,11 +1,70 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using Newtonsoft.Json.Linq;
 
 namespace MassTransit.Gateway.MessageBuilder
 {
     public static class DynamicTypeBuilder
     {
+        public static Type BuildMessageType(string className, string messageJson)
+        {
+            if (className.IsNullOrEmpty())
+                throw new ArgumentNullException(nameof(className));
+            if (messageJson.IsNullOrEmpty())
+                throw new ArgumentNullException(nameof(messageJson));
+
+            var properties = JObject.Parse(messageJson).Children()
+                .Where(x => x.Type == JTokenType.Property)
+                .Select(x => (JProperty) x)
+                .Select(GetPropertyDefinition)
+                .ToArray();
+
+            var definition = new MessageTypeDefinition(className, properties);
+
+            return BuildMessageType(definition);
+        }
+
+        private static PropertyDefinition GetPropertyDefinition(JProperty j)
+        {
+            var typeCode = ((JValue) j.Value).Type;
+            Type type;
+            switch (typeCode)
+            {
+                case JTokenType.Integer:
+                    type = typeof(long);
+                    break;
+                case JTokenType.Float:
+                    type = typeof(float);
+                    break;
+                case JTokenType.String:
+                    type = typeof(string);
+                    break;
+                case JTokenType.Boolean:
+                    type = typeof(bool);
+                    break;
+                case JTokenType.Date:
+                    type = typeof(DateTime);
+                    break;
+                case JTokenType.Bytes:
+                    type = typeof(byte[]);
+                    break;
+                case JTokenType.Guid:
+                    type = typeof(Guid);
+                    break;
+                case JTokenType.Uri:
+                    type = typeof(Uri);
+                    break;
+                case JTokenType.TimeSpan:
+                    type = typeof(TimeSpan);
+                    break;
+                default:
+                    throw new NotImplementedByDesignException($"JSON type {typeCode.ToString()} is not supported");
+            }
+            return new PropertyDefinition(j.Name, type);
+        }
+
         public static Type BuildMessageType(MessageTypeDefinition messageTypeDefinition)
         {
             var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(

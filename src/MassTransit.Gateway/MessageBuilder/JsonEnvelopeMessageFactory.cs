@@ -1,10 +1,13 @@
 using System;
+using MassTransit.Gateway.Logging;
 using Newtonsoft.Json;
 
 namespace MassTransit.Gateway.MessageBuilder
 {
     public static class JsonEnvelopeMessageFactory
     {
+        private static readonly ILog Log = LogProvider.GetLogger(typeof(JsonEnvelopeMessageFactory));
+
         public static MessageEnvelope CreateMessage(string className, string messageJson)
         {
             if (className.IsNullOrEmpty())
@@ -14,11 +17,15 @@ namespace MassTransit.Gateway.MessageBuilder
 
             var messageType = MessageTypeCache.TryGetType(className);
             if (messageType == null)
-                throw new Exception($"Type {className} was not found in cache");
+            {
+                Log.Warn($"Class {className} was not found in MessageTypeCache. Try to dynamically build type.");
+                messageType = DynamicTypeBuilder.BuildMessageType(className, messageJson);
+            }
 
             return new MessageEnvelope(
                 JsonConvert.DeserializeObject(messageJson, messageType),
                 messageType);
         }
+
     }
 }
